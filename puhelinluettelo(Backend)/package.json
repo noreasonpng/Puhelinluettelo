@@ -1,0 +1,23 @@
+{
+  "name": "puhelinluettelo",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "Tuukka Kovalainen",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:ui": "rm -rf dist && cd Puhelinluettelo/Frontend && npm run build && cp -r dist Puhelinluettelo/Backend",
+    "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongodb": "^7.4.0",
+    "mongoose": "^9.7.3",
+    "morgan": "^1.11.0"
+  }
+}
