@@ -16,35 +16,15 @@ morgan.token('body', (request) => {
 })
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
 
-const unknownEndpoint = (request, response) => {
-    response.status(404).send({error: 'unknown endpoint'})
-}
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
 
-app.use(unknownEndpoint)
-
-let persons = [
-    {
-        id: "1",
-        name: "Arto Hellas",
-        number: "040-123456"
-    },
-    {
-        id: "2",
-        name: "Ada Lovelace",
-        number: "39-44-532532"
-    },
-    {
-        id: "3",
-        name: "Dan Abramov",
-        number: "12-12-111111"
-    },
-    {
-        id: "4",
-        name: "Mary Poppendick",
-        number: "39-23-000000"
+    if(error.name === 'CastError'){
+        return response.status(400).send({error: 'malformatted id'})
     }
-]
 
+    next(error)
+}
 
 app.get('/', (request, response) => {
     response.send('<p>Hello World</p>')
@@ -56,15 +36,19 @@ app.get('/api/persons', (request, response) => {
   })
 })
 
-app.get('/info', (request, response) => {
-    response.send(`<p>Phonebook has info for ${persons.length} people</p>
-                    <p>${new Date()}</p>`)
+app.get('/info', (request, response, next) => {
+    Person.countDocuments({})
+        .then(count => {
+            response.send(`<p>Phonebook has info for ${count} people</p>
+                            <p>${new Date()}</p>`)
+        })
+        .catch(error => next(error))
 })
 
-app.get('/api/persons/:id', (request, response) => {
+app.get('/api/persons/:id', (request, response, next) => {
   Person.findById(request.params.id).then(person => {
     if(person){
-        response.json(note)
+        response.json(person)
     }else{
         response.status(404).end()
     }
@@ -73,9 +57,42 @@ app.get('/api/persons/:id', (request, response) => {
 })
 
 
+app.put('/api/persons/:id', (request, response, next) => {
+    const body = request.body
+    const name = body.name?.trim()
+    const number = body.number?.trim()
 
+    if(!name || !number){
+        return response.status(400).json({
+            error: 'content missing'
+        })
+    }
 
-app.delete('/api/persons/:id', (request, response) => {
+    Person.findById(request.params.id)
+        .then(person => {
+            if(!person){
+                return response.status(404).end()
+            }
+
+            return findDuplicatePerson(name, number, request.params.id).then(existingPerson => {
+                if(existingPerson){
+                    return response.status(400).json({
+                        error: 'name and number must be unique'
+                    })
+                }
+
+                return Person.findByIdAndUpdate(request.params.id, { name, number }, {
+                    new: true,
+                    runValidators: true
+                }).then(updatedPerson => {
+                    response.json(updatedPerson)
+                })
+            })
+        })
+        .catch(error => next(error))
+})
+
+app.delete('/api/persons/:id', (request, response, next) => {
   Person.findByIdAndDelete(request.params.id)
   .then(result => {
     response.status(204).end()
@@ -85,64 +102,59 @@ app.delete('/api/persons/:id', (request, response) => {
 
 app.post('/api/persons', (request, response) => {
     const body = request.body
-    if(!body.number || !body.name){
+    const name = body.name?.trim()
+    const number = body.number?.trim()
+
+    if(!name || !number){
         return response.status(400).json({
             error: 'content missing'
         })
     }
-    if(checkNewNumber(body) === 1){
-        return response.status(400).json({
-            error: 'Name must be unique'
-        })
-    }
-    if(checkNewNumber(body) === 2){
-        return response.status(400).json({
-            error: 'Number must be unique'
-        })
-    }
 
     const person = new Person({
-        name: body.name,
-        number: body.number
+        name,
+        number
     })
 
-    person.save().then(savedPerson => {
-        response.json(savedPerson)
-    })
+    findDuplicatePerson(name, number)
+        .then(existingPerson => {
+            if(existingPerson){
+                return response.status(400).json({
+                    error: 'name and number must be unique'
+                })
+            }
 
-    persons = persons.concat(person)
+            return person.save().then(savedPerson => {
+                response.json(savedPerson)
+            })
+        })
+        .catch(error => response.status(400).json({ error: error.message }))
 
 })
 
-const checkNewNumber = (body) =>{
-    for(let i = 0; i < persons.length; i++){
-        let person = persons[i]
-        if(body.name === person.name){
-            return 1
-        }
-        if(body.number === person.number){
-            return 2
-        }
+const findDuplicatePerson = (name, number, excludeId) => {
+    const query = {
+        $or: [{ name }, { number }]
     }
+
+    if(excludeId){
+        query._id = { $ne: excludeId }
+    }
+
+    return Person.findOne(query)
 }
 
-const generateId = () => {
-   return Math.floor(Math.random() * (10000 - 0 + 1)) + 0
+const unknownEndpoint = (request, response) => {
+    response.status(404).send({error: 'unknown endpoint'})
 }
+
+app.use(unknownEndpoint)
+app.use(errorHandler)
 
 const PORT = process.env.PORT
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })
 
-const errorHandler = (error, request, response, next) => {
-    console.error(error.message)
 
-    if(error.name === 'CastError'){
-        return response.status(400).send({error: 'malformatted id'})
-    }
 
-    next(error)
-}
-
-app.use(errorHandler)
