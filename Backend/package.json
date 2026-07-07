@@ -11,7 +11,8 @@
     "dev": "node --watch index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:ui": "rm -rf dist && cd Puhelinluettelo/Frontend && npm run build && cp -r dist Puhelinluettelo/Backend",
-    "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push"
+    "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push",
+    "lint": "eslint ."
   },
   "dependencies": {
     "dotenv": "^17.4.2",
@@ -19,5 +20,11 @@
     "mongodb": "^7.4.0",
     "mongoose": "^9.7.3",
     "morgan": "^1.11.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0"
   }
 }
